@@ -1,10 +1,22 @@
+import fs from "node:fs";
+import path from "node:path";
 import { PROGRAM_TEMPLATE_IDS } from "@refref/types";
 import { createDb, schema } from "./index.js";
+import { hashPassword } from "better-auth/crypto";
 
-// Get database URL from environment
+// Load environment variables from apps/webapp/.env if DATABASE_URL is not set
+if (!process.env.DATABASE_URL) {
+  const envPath = path.resolve(process.cwd(), "../../apps/webapp/.env");
+  if (fs.existsSync(envPath) && typeof process.loadEnvFile === "function") {
+    process.loadEnvFile(envPath);
+  }
+}
+
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is required");
+  throw new Error(
+    "DATABASE_URL environment variable is required. Ensure apps/webapp/.env is populated or set DATABASE_URL in your shell.",
+  );
 }
 
 const db = createDb(DATABASE_URL);
@@ -421,6 +433,24 @@ const seedData = async () => {
         .values([...SEED_DATA.USERS])
         .onConflictDoNothing();
       console.log(`   ✓ Inserted ${SEED_DATA.USERS.length} user(s)`);
+
+      // 1b. User Accounts (Credentials)
+      console.log("🔐 Creating user account credentials...");
+      const hashedPassword = await hashPassword("Password123!");
+      const ACCOUNTS = SEED_DATA.USERS.map((u) => ({
+        id: `acc_${u.id}`,
+        accountId: u.id,
+        providerId: "credential",
+        userId: u.id,
+        password: hashedPassword,
+      }));
+      await tx
+        .insert(schema.account)
+        .values(ACCOUNTS)
+        .onConflictDoNothing();
+      console.log(
+        `   ✓ Inserted ${ACCOUNTS.length} user account credential(s)`,
+      );
 
       // 2. Organizations
       console.log("🏢 Creating organizations...");
