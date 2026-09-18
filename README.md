@@ -80,12 +80,21 @@ If you prefer running RefRef locally without Docker:
 - pnpm 10.23.0
 - PostgreSQL database
 - [portless](https://github.com/vercel-labs/portless) (`npm install -g portless`)
+- *(Optional)* [Infisical CLI](https://infisical.com) (`winget install Infisical.Infisical` on Windows) to suppress `'infisical' is not recognized` warnings.
+
+> You may see `'infisical' is not recognized`. This is safe to ignore. Scripts try Infisical first, then run without it. Alternatively, install it on Windows via `winget install Infisical.Infisical`.
 
 #### Installation
 
 ```bash
 # Install dependencies
 pnpm install
+
+# Build internal packages (required before any db command)
+pnpm --filter "./packages/*" build
+
+# Create the database (skip if it already exists)
+createdb -U postgres refref
 
 # Set up environment variables
 cp apps/webapp/.env.example apps/webapp/.env
@@ -94,6 +103,7 @@ cp apps/webapp/.env.example apps/webapp/.env
 # Generate auth secret with: openssl rand -base64 32
 
 # Export DATABASE_URL for database commands
+# (must match DATABASE_URL in apps/webapp/.env)
 export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/refref"
 
 # Push database schema
@@ -102,9 +112,51 @@ pnpm -F @refref/coredb db:push
 # (Optional) Seed with template data
 pnpm -F @refref/coredb db:seed
 
+# Start portless proxy on port 1355 with plain HTTP (once, portless remembers it)
+# (newer portless defaults to HTTPS on port 443, but .env expects http://*.localhost:1355)
+portless proxy start -p 1355 --no-tls
+
 # Start development server
 pnpm dev
 ```
+
+<details>
+<summary>Windows (PowerShell) equivalents</summary>
+
+```powershell
+# Install dependencies
+pnpm install
+
+# Build internal packages (required before any db command)
+pnpm --filter "./packages/*" build
+
+# Create the database (skip if it already exists)
+& "C:\Program Files\PostgreSQL\17\bin\createdb.exe" -U postgres refref
+
+# Set up environment variables
+copy apps\webapp\.env.example apps\webapp\.env
+
+# Edit .env and add your database URL and auth secret
+# Generate auth secret with: openssl rand -base64 32
+
+# Export DATABASE_URL for database commands
+# (must match DATABASE_URL in apps/webapp/.env)
+$env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/refref"
+
+# Push database schema
+pnpm -F @refref/coredb db:push
+
+# (Optional) Seed with template data
+pnpm -F @refref/coredb db:seed
+
+# Start portless proxy on port 1355 with plain HTTP (once, portless remembers it)
+# (newer portless defaults to HTTPS on port 443, but .env expects http://*.localhost:1355)
+portless proxy start -p 1355 --no-tls
+
+# Start development server
+pnpm dev
+```
+</details>
 
 Each app gets a stable `.localhost` URL via [portless](https://github.com/vercel-labs/portless):
 
